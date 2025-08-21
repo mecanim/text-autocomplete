@@ -66,7 +66,9 @@ stack-data==0.6.3
 sympy==1.14.0
 threadpoolctl==3.6.0
 tokenizers==0.21.1
-torch==2.7.1
+torch==2.7.1+cu118
+torchvision==0.22.1+cu118
+torchaudio==2.7.1+cu118 --index-url https://download.pytorch.org/whl/cu118
 tornado==6.5.1
 tqdm==4.67.1
 traitlets==5.14.3
@@ -81,3 +83,8 @@ evaluate==0.4.4
 nltk==3.9.1
 absl-py==2.3.0
 rouge_score==0.1.2
+ipywidgets==8.1.5
+widgetsnbextension==4.0.12  # Для Jupyter Notebook
+ipympl==0.9.4              # Интерактивный matplotlib
+ipycanvas==0.14.0          # Canvas для рисования
+ipyevents==2.0.2 
