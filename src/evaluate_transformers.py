@@ -3,6 +3,7 @@ from transformers import pipeline, AutoTokenizer
 import torch
 from tqdm import tqdm
 import numpy as np
+import torch.nn.functional as F
 
 def evaluate_distilgpt2_rouge(test_texts, max_length=50, device=0):
     print("Загрузка модели DistilGPT2...")
@@ -85,3 +86,76 @@ def evaluate_distilgpt2_rouge(test_texts, max_length=50, device=0):
     else:
         print("Не удалось получить предсказания для вычисления метрик")
         return None
+    
+
+def generate_text(model, initial_tokens, vocab, device, max_length=50, temperature=1.0, top_k=5):
+    model.eval()
+    generated_tokens = initial_tokens.copy()
+    
+    reverse_vocab = {v: k for k, v in vocab.items()}
+    
+    print(f"\nНачальный контекст: {' '.join(initial_tokens)}")
+    print("ГЕНЕРАЦИЯ ТЕКСТА:")
+    
+    with torch.no_grad():
+        for step in range(max_length):
+            # Подготавливаем входные данные
+            input_ids = []
+            for token in generated_tokens:
+                input_ids.append(vocab.get(token, vocab['<UNK>']))
+            
+            input_tensor = torch.tensor([input_ids], dtype=torch.long).to(device)
+            
+            # Получаем предсказание
+            output, _ = model(input_tensor)
+            output = output / temperature
+            
+            # Применяем top-k sampling
+            probs = F.softmax(output, dim=-1)
+            top_probs, top_indices = torch.topk(probs, top_k, dim=-1)
+            
+            # Выбираем случайный токен из top-k
+            chosen_idx = torch.multinomial(top_probs[0], 1).item()
+            next_token_idx = top_indices[0][chosen_idx].item()
+            next_token = reverse_vocab.get(next_token_idx, '<UNK>')
+            
+            # Добавляем к сгенерированному тексту
+            generated_tokens.append(next_token)
+            
+            # Останавливаемся на точке или подобном знаке
+            if next_token in ['.', '!', '?'] and step > 10:
+                break
+    
+    generated_text = ' '.join(generated_tokens)
+    return generated_text
+
+def calculate_similarity(str1, str2):
+    words1 = set(str1.lower().split())
+    words2 = set(str2.lower().split())
+    
+    if not words1 or not words2:
+        return 0.0
+    
+    intersection = words1.intersection(words2)
+    return len(intersection) / max(len(words1), len(words2))
+
+def evaluate_text_generation(model, test_cases, vocab, device):
+    print("\n" + "ОЦЕНКА КАЧЕСТВА ГЕНЕРАЦИИ" + "\n")
+
+    for i, (initial_tokens, expected_continuation) in enumerate(test_cases, 1):
+        generated_text = generate_text(
+            model, 
+            initial_tokens, 
+            vocab, 
+            device,
+            max_length=30,
+            temperature=0.7
+        )
+        
+        generated_continuation = ' '.join(generated_text.split()[len(initial_tokens):])
+        
+        print(f"\nТест {i}:")
+        print(f"Контекст:    {' '.join(initial_tokens)}")
+        print(f"Ожидалось:   {expected_continuation}")
+        print(f"Сгенерировано: {generated_continuation}")
+        print(f"Схожесть:    {calculate_similarity(expected_continuation, generated_continuation):.2f}")
