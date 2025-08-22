@@ -159,3 +159,48 @@ def evaluate_text_generation(model, test_cases, vocab, device):
         print(f"Ожидалось:   {expected_continuation}")
         print(f"Сгенерировано: {generated_continuation}")
         print(f"Схожесть:    {calculate_similarity(expected_continuation, generated_continuation):.2f}")
+
+def compare_models_generation(lstm_model, test_cases, vocab, device, gpt2_generator, gpt2_tokenizer):
+    print("\n" + "="*60)
+    print("СРАВНЕНИЕ ГЕНЕРАЦИИ LSTM vs DistilGPT2")
+    print("="*60)
+    
+    for i, (initial_tokens, expected_continuation) in enumerate(test_cases, 1):
+        # Генерация LSTM
+        lstm_generated = generate_text(
+            lstm_model, 
+            initial_tokens, 
+            vocab, 
+            device,
+            max_length=30,
+            temperature=0.7
+        )
+        lstm_continuation = ' '.join(lstm_generated.split()[len(initial_tokens):])
+        
+        # Генерация DistilGPT2
+        context = ' '.join(initial_tokens)
+        try:
+            gpt2_result = gpt2_generator(
+                context,
+                max_length=len(context.split()) + 15,
+                do_sample=True,
+                top_k=50,
+                num_return_sequences=1,
+                pad_token_id=gpt2_tokenizer.eos_token_id
+            )
+            gpt2_full_text = gpt2_result[0]["generated_text"]
+            gpt2_continuation = gpt2_full_text[len(context):].strip()
+        except Exception as e:
+            print(f"Ошибка GPT2 генерации: {e}")
+            gpt2_continuation = "Ошибка генерации"
+        
+        # Вычисление схожести
+        lstm_similarity = calculate_similarity(expected_continuation, lstm_continuation)
+        gpt2_similarity = calculate_similarity(expected_continuation, gpt2_continuation)
+        
+        print(f"\nТЕСТ {i}:")
+        print(f"Контекст:     {context}")
+        print(f"Ожидалось:    {expected_continuation}")
+        print(f"LSTM:         {lstm_continuation} (схожесть: {lstm_similarity:.2f})")
+        print(f"DistilGPT2:   {gpt2_continuation} (схожесть: {gpt2_similarity:.2f})")
+        print("-" * 80)
